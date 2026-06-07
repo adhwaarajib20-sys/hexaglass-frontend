@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "MigasQueueHexaglass",
-    "slug": "MigasQueueHexaglass",
+    "name": "PT Migas X Hexaglass",
+    "slug": "PT Migas X Hexaglass",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "migasqueuehexaglass",
+    "icon": "./assets/images/logo.png",
+    "scheme": "PT Migas X Hexaglass",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

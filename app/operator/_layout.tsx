@@ -1,5 +1,6 @@
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Tabs } from "expo-router";
-import { Text } from "react-native";
 
 export default function OperatorLayout() {
   return (
@@ -22,8 +23,12 @@ export default function OperatorLayout() {
         name="antrean"
         options={{
           title: "Antrean",
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 22, color }}>📋</Text>
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="clipboard-list"
+              size={size}
+              color={color}
+            />
           ),
         }}
       />
@@ -31,8 +36,8 @@ export default function OperatorLayout() {
         name="laporan"
         options={{
           title: "Laporan",
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 22, color }}>📝</Text>
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="assignment" size={size} color={color} />
           ),
         }}
       />
@@ -40,8 +45,8 @@ export default function OperatorLayout() {
         name="perusahaan"
         options={{
           title: "Perusahaan",
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 22, color }}>🏢</Text>
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="building" size={size} color={color} />
           ),
         }}
       />

@@ -1,5 +1,6 @@
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Tabs } from "expo-router";
-import { Text } from "react-native";
 
 export default function SupirLayout() {
   return (
@@ -21,28 +22,36 @@ export default function SupirLayout() {
         name="scan"
         options={{
           title: "Scan & Daftar",
-          tabBarIcon: () => <Text style={{ fontSize: 20 }}>📷</Text>,
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="camera-alt" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="antrean"
         options={{
           title: "Status Antrean",
-          tabBarIcon: () => <Text style={{ fontSize: 20 }}>🎫</Text>,
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="ticket" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="laporan"
         options={{
           title: "Laporan",
-          tabBarIcon: () => <Text style={{ fontSize: 20 }}>📝</Text>,
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="assignment" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="form-laporan"
         options={{
           title: "Buat Laporan",
-          tabBarIcon: () => <Text style={{ fontSize: 20 }}>➕</Text>,
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="add-circle" size={size} color={color} />
+          ),
         }}
       />
     </Tabs>

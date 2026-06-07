@@ -1,3 +1,4 @@
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -10,8 +11,10 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
+
 import { Button, Divider } from "../../components/UI";
 import {
   Colors,
@@ -24,19 +27,26 @@ import { useAuth } from "../../context/AuthContext";
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const { width } = useWindowDimensions();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
+
+  const isSmallScreen = width < 380;
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert("Peringatan", "Email dan password harus diisi");
       return;
     }
+
     setLoading(true);
+
     try {
       const user = await login(email.trim(), password);
+
       switch (user.role) {
         case "admin":
           router.replace("/admin/dashboard");
@@ -55,13 +65,15 @@ export default function LoginScreen() {
       }
     } catch (error) {
       let msg = "Email atau password salah";
-      if (!error.response) {
+
+      if (!error?.response) {
         msg = "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.";
       } else if (error.response?.status >= 500) {
         msg = "Terjadi kesalahan pada server. Hubungi administrator.";
       } else if (error.response?.data?.message) {
         msg = error.response.data.message;
       }
+
       Alert.alert("Login Gagal", msg);
     } finally {
       setLoading(false);
@@ -74,35 +86,43 @@ export default function LoginScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[
+          styles.scroll,
+          isSmallScreen && styles.scrollSmall,
+        ]}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        {/* Logo & Branding */}
         <View style={styles.brandContainer}>
-          <View style={styles.logoWrapper}>
+          <View style={[styles.logoWrapper, isSmallScreen && styles.logoSmall]}>
             <Image
               source={require("../../../assets/images/logo.png")}
               style={styles.logo}
               resizeMode="contain"
             />
           </View>
+
           <Text style={styles.appName}>MigasQueue</Text>
           <Text style={styles.companyName}>PT Migas Hilir Jabar</Text>
           <Text style={styles.tagline}>Sistem Antrean & Pelaporan Digital</Text>
         </View>
 
-        {/* Login Card */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Masuk ke Akun</Text>
           <Text style={styles.cardSubtitle}>
             Masukkan kredensial Anda untuk melanjutkan
           </Text>
 
-          {/* Email */}
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Email</Text>
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputIcon}>✉️</Text>
+              <Ionicons
+                name="mail-outline"
+                size={20}
+                color={Colors.textSecondary}
+                style={styles.inputIcon}
+              />
+
               <TextInput
                 style={styles.input}
                 placeholder="contoh@email.com"
@@ -116,29 +136,39 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          {/* Password */}
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Password</Text>
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputIcon}>🔒</Text>
+              <Ionicons
+                name="lock-closed-outline"
+                size={20}
+                color={Colors.textSecondary}
+                style={styles.inputIcon}
+              />
+
               <TextInput
-                style={[styles.input, { flex: 1 }]}
+                style={styles.input}
                 placeholder="Masukkan password"
                 placeholderTextColor={Colors.textLight}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPass}
               />
+
               <TouchableOpacity
                 onPress={() => setShowPass(!showPass)}
                 style={styles.eyeBtn}
+                activeOpacity={0.7}
               >
-                <Text>{showPass ? "🙈" : "👁️"}</Text>
+                <Ionicons
+                  name={showPass ? "eye-off-outline" : "eye-outline"}
+                  size={21}
+                  color={Colors.textSecondary}
+                />
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Login Button */}
           <Button
             title="Masuk"
             onPress={handleLogin}
@@ -150,26 +180,32 @@ export default function LoginScreen() {
 
           <Divider label="atau" />
 
-          {/* Supir Button */}
           <TouchableOpacity
             style={styles.supirBtn}
             onPress={() => router.replace("/supir/scan")}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
             <View style={styles.supirBtnLeft}>
-              <Text style={styles.supirIcon}>🚛</Text>
-              <View>
+              <View style={styles.supirIconBox}>
+                <MaterialCommunityIcons
+                  name="truck-delivery-outline"
+                  size={28}
+                  color={Colors.primary}
+                />
+              </View>
+
+              <View style={styles.supirTextBox}>
                 <Text style={styles.supirTitle}>Masuk sebagai Supir</Text>
                 <Text style={styles.supirSubtitle}>
                   Scan barcode dari petugas satpam
                 </Text>
               </View>
             </View>
-            <Text style={styles.supirArrow}>›</Text>
+
+            <Ionicons name="chevron-forward" size={22} color={Colors.primary} />
           </TouchableOpacity>
         </View>
 
-        {/* Footer */}
         <Text style={styles.footer}>
           © 2026 PT Migas Hilir Jabar. All rights reserved.
         </Text>
@@ -179,17 +215,23 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.primary },
+  container: {
+    flex: 1,
+    backgroundColor: Colors.primary,
+  },
   scroll: {
     flexGrow: 1,
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.xl,
+    justifyContent: "center",
+  },
+  scrollSmall: {
+    paddingHorizontal: Spacing.md,
   },
 
-  // Brand
   brandContainer: {
     alignItems: "center",
-    paddingTop: 60,
+    paddingTop: 45,
     paddingBottom: Spacing.xl,
   },
   logoWrapper: {
@@ -202,12 +244,25 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     ...Shadow.lg,
   },
-  logo: { width: 70, height: 70 },
-  appName: { ...Typography.h1, color: Colors.white, marginBottom: 2 },
+  logoSmall: {
+    width: 78,
+    height: 78,
+    borderRadius: 20,
+  },
+  logo: {
+    width: 70,
+    height: 70,
+  },
+  appName: {
+    ...Typography.h1,
+    color: Colors.white,
+    marginBottom: 2,
+  },
   companyName: {
     ...Typography.h4,
     color: "rgba(255,255,255,0.85)",
     marginBottom: 4,
+    textAlign: "center",
   },
   tagline: {
     ...Typography.caption,
@@ -215,28 +270,36 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Card
   card: {
+    width: "100%",
+    maxWidth: 430,
+    alignSelf: "center",
     backgroundColor: Colors.white,
     borderRadius: 24,
     padding: Spacing.lg,
     ...Shadow.lg,
   },
-  cardTitle: { ...Typography.h3, color: Colors.textPrimary, marginBottom: 4 },
+  cardTitle: {
+    ...Typography.h3,
+    color: Colors.textPrimary,
+    marginBottom: 4,
+  },
   cardSubtitle: {
     ...Typography.bodySmall,
     color: Colors.textSecondary,
     marginBottom: Spacing.lg,
   },
 
-  // Input
-  inputGroup: { marginBottom: Spacing.md },
+  inputGroup: {
+    marginBottom: Spacing.md,
+  },
   inputLabel: {
     ...Typography.label,
     color: Colors.textPrimary,
     marginBottom: 6,
   },
   inputWrapper: {
+    minHeight: 52,
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1.5,
@@ -245,16 +308,20 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     paddingHorizontal: Spacing.sm,
   },
-  inputIcon: { fontSize: 16, marginRight: 6 },
+  inputIcon: {
+    marginRight: 8,
+  },
   input: {
     flex: 1,
-    paddingVertical: 13,
+    paddingVertical: Platform.OS === "ios" ? 14 : 10,
     fontSize: 15,
     color: Colors.textPrimary,
   },
-  eyeBtn: { padding: 8 },
+  eyeBtn: {
+    padding: 8,
+    marginLeft: 4,
+  },
 
-  // Supir Button
   supirBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -265,17 +332,33 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     padding: Spacing.md,
   },
-  supirBtnLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  supirIcon: { fontSize: 28 },
-  supirTitle: { ...Typography.label, color: Colors.primary },
+  supirBtnLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  supirIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: Colors.white,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  supirTextBox: {
+    flex: 1,
+  },
+  supirTitle: {
+    ...Typography.label,
+    color: Colors.primary,
+  },
   supirSubtitle: {
     ...Typography.caption,
     color: Colors.textSecondary,
     marginTop: 2,
   },
-  supirArrow: { fontSize: 24, color: Colors.primary, fontWeight: "bold" },
 
-  // Footer
   footer: {
     ...Typography.caption,
     color: "rgba(255,255,255,0.5)",

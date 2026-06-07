@@ -1,14 +1,9 @@
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Alert, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import QRCode from "react-native-qrcode-svg";
-import { generateBarcode } from "../../api/sesi";
-import {
-  Button,
-  Card,
-  Header,
-  LogoutButton
-} from "../../components/UI";
+import { generateBarcode, statusBarcode } from "../../api/sesi";
+import { Button, Card, Header, LogoutButton } from "../../components/UI";
 import { Colors, Shadow, Spacing, Typography } from "../../constants/theme";
 import { useAuth } from "../../context/AuthContext";
 
@@ -17,6 +12,8 @@ export default function SatpamQRScreen() {
   const [barcodeData, setBarcodeData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [timeLeft, setTimeLeft] = useState(null);
+  const [pollingInterval, setPollingInterval] = useState(null);
+  const [countdownInterval, setCountdownInterval] = useState(null);
 
   const handleLogout = async () => {
     await logout();
@@ -25,6 +22,9 @@ export default function SatpamQRScreen() {
 
   const handleGenerate = async () => {
     setLoading(true);
+    // Clear polling & countdown interval sebelumnya
+    if (pollingInterval) clearInterval(pollingInterval);
+    if (countdownInterval) clearInterval(countdownInterval);
     try {
       const res = await generateBarcode();
       setBarcodeData(res.data.data);
@@ -43,6 +43,7 @@ export default function SatpamQRScreen() {
           setTimeLeft(diff);
         }
       }, 1000);
+      setCountdownInterval(interval);
     } catch (e) {
       Alert.alert("Gagal", "Gagal generate barcode. Coba lagi.");
     } finally {
@@ -60,6 +61,46 @@ export default function SatpamQRScreen() {
       console.log("Share error:", e);
     }
   };
+
+  // Polling untuk deteksi ketika QR sudah di-scan & dihapus oleh supir
+  useEffect(() => {
+    if (!barcodeData) return;
+
+    const checkQRStatus = async () => {
+      try {
+        const res = await statusBarcode();
+        if (!res.data?.status) {
+          // QR sudah dihapus atau tidak ada lagi
+          // Hentikan countdown timer
+          if (countdownInterval) clearInterval(countdownInterval);
+          setBarcodeData(null);
+          setTimeLeft(null);
+          Alert.alert(
+            "✅ QR Code Terpakai",
+            "QR code sudah berhasil di-scan oleh supir dan kendaraan telah terdaftar antrean.",
+          );
+        }
+      } catch (e) {
+        // Jika error (misal QR not found), berarti QR sudah dihapus
+        // Hentikan countdown timer
+        if (countdownInterval) clearInterval(countdownInterval);
+        setBarcodeData(null);
+        setTimeLeft(null);
+        Alert.alert(
+          "✅ QR Code Terpakai",
+          "QR code sudah berhasil di-scan oleh supir dan kendaraan telah terdaftar antrean.",
+        );
+      }
+    };
+
+    // Poll setiap 5 detik
+    const interval = setInterval(checkQRStatus, 5000);
+    setPollingInterval(interval);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [barcodeData, countdownInterval]);
 
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60);

@@ -1,21 +1,38 @@
-import React, { useEffect, useState } from "react";
+import { MaterialIcons } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system";
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { getAntrean } from "../../api/antrean";
+import { getExportAntreanUrl } from "../../api/laporan";
+import { Button, Header, LogoutButton } from "../../components/UI";
 import { useAuth } from "../../context/AuthContext";
 import { formatStatus, formatWaktu } from "../../utils/helpers";
 
 export default function AdminAntreanScreen() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [antrean, setAntrean] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+  const [exporting, setExporting] = useState(false);
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace("/login");
+  };
 
   useEffect(() => {
     fetchAntrean();
@@ -23,13 +40,38 @@ export default function AdminAntreanScreen() {
 
   const fetchAntrean = async () => {
     try {
-      const res = await getAntrean();
+      const res = await getAntrean(selectedDate);
       setAntrean(res.data.data);
     } catch (e) {
       console.log(e.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      const { url, token } = await getExportAntreanUrl(
+        selectedDate,
+        selectedDate,
+      );
+      const fileName = `antrean-${selectedDate}.xlsx`;
+      const fileUri = FileSystem.cacheDirectory + fileName;
+
+      await FileSystem.downloadAsync(url, fileUri, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      Alert.alert("Berhasil", `File ${fileName} berhasil diunduh`, [
+        { text: "OK" },
+      ]);
+    } catch (error) {
+      console.log("Export error:", error);
+      Alert.alert("Gagal", "Gagal mengunduh file Excel");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -51,12 +93,43 @@ export default function AdminAntreanScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Monitor Antrean</Text>
-        <Text style={styles.headerSubtitle}>
-          Total: {antrean.length} antrean
-        </Text>
+      <Header
+        title="Monitor Antrean"
+        subtitle={`Total: ${antrean.length} antrean`}
+        showLogo
+        rightAction={<LogoutButton onPress={handleLogout} />}
+      />
+
+      {/* Export Toolbar */}
+      <View style={styles.toolbar}>
+        <View style={styles.dateInputGroup}>
+          <Text style={styles.label}>Pilih Tanggal:</Text>
+          <TextInput
+            style={styles.dateInput}
+            placeholder="YYYY-MM-DD"
+            value={selectedDate}
+            onChangeText={setSelectedDate}
+            placeholderTextColor="#9ca3af"
+          />
+          <TouchableOpacity
+            style={styles.filterBtn}
+            onPress={() => {
+              setLoading(true);
+              fetchAntrean();
+            }}
+          >
+            <MaterialIcons name="search" size={18} color="#fff" />
+            <Text style={styles.filterBtnText}>Filter</Text>
+          </TouchableOpacity>
+        </View>
+        <Button
+          title="📥 Export Excel"
+          onPress={handleExportExcel}
+          loading={exporting}
+          disabled={exporting}
+        />
       </View>
+
       <FlatList
         data={antrean}
         keyExtractor={(item) => item.id.toString()}
@@ -107,9 +180,47 @@ export default function AdminAntreanScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f0f4f8" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  header: { backgroundColor: "#1a56db", padding: 20, paddingTop: 50 },
-  headerTitle: { color: "#fff", fontSize: 20, fontWeight: "bold" },
-  headerSubtitle: { color: "#bfdbfe", fontSize: 13 },
+  toolbar: {
+    backgroundColor: "#fff",
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+    gap: 10,
+  },
+  dateInputGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#374151",
+  },
+  dateInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
+    color: "#1f2937",
+  },
+  filterBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#3b82f6",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  filterBtnText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
   card: {
     backgroundColor: "#fff",
     borderRadius: 10,

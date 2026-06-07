@@ -1,17 +1,18 @@
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import {
-    ActivityIndicator,
-    Image,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    Colors,
-    Radius,
-    Shadow,
-    Spacing,
-    Typography,
+  Colors,
+  Radius,
+  Shadow,
+  Spacing,
+  Typography,
 } from "../constants/theme";
 
 // ─── BUTTON ───────────────────────────────────────────────
@@ -89,11 +90,21 @@ export const Button = ({
         <ActivityIndicator color={v.text} size="small" />
       ) : (
         <View style={btnStyles.content}>
-          {icon && (
-            <Text style={[btnStyles.icon, { fontSize: s.fontSize + 2 }]}>
-              {icon}
-            </Text>
-          )}
+          {icon &&
+            (typeof icon === "string" &&
+            icon.length < 25 &&
+            !icon.match(/[\p{Emoji}]/gu) ? (
+              <MaterialIcons
+                name={icon}
+                size={s.fontSize + 4}
+                color={disabled ? Colors.textLight : v.text}
+                style={{ marginRight: 4 }}
+              />
+            ) : (
+              <Text style={[btnStyles.icon, { fontSize: s.fontSize + 2 }]}>
+                {icon}
+              </Text>
+            ))}
           <Text
             style={[
               btnStyles.text,
@@ -237,13 +248,30 @@ export const StatusBadge = ({ status, type = "antrean" }) => {
 };
 
 // ─── EMPTY STATE ──────────────────────────────────────────
-export const EmptyState = ({ icon = "📭", title, subtitle }) => (
-  <View style={emptyStyles.container}>
-    <Text style={emptyStyles.icon}>{icon}</Text>
-    <Text style={emptyStyles.title}>{title}</Text>
-    {subtitle && <Text style={emptyStyles.subtitle}>{subtitle}</Text>}
-  </View>
-);
+export const EmptyState = ({ icon = "📭", title, subtitle }) => {
+  // Check if icon is an emoji or an icon name for Material Icons
+  const isIconName =
+    typeof icon === "string" &&
+    icon.length < 20 &&
+    !icon.match(/[\p{Emoji}]/gu);
+
+  return (
+    <View style={emptyStyles.container}>
+      {isIconName ? (
+        <MaterialIcons
+          name={icon}
+          size={48}
+          color={Colors.textLight}
+          style={emptyStyles.iconComponent}
+        />
+      ) : (
+        <Text style={emptyStyles.icon}>{icon}</Text>
+      )}
+      <Text style={emptyStyles.title}>{title}</Text>
+      {subtitle && <Text style={emptyStyles.subtitle}>{subtitle}</Text>}
+    </View>
+  );
+};
 
 const emptyStyles = StyleSheet.create({
   container: {
@@ -253,6 +281,7 @@ const emptyStyles = StyleSheet.create({
     padding: Spacing.xl,
   },
   icon: { fontSize: 48, marginBottom: Spacing.sm },
+  iconComponent: { marginBottom: Spacing.sm },
   title: {
     ...Typography.h4,
     color: Colors.textPrimary,

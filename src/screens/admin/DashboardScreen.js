@@ -1,19 +1,25 @@
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import * as FileSystem from "expo-file-system";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    Alert,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View
 } from "react-native";
 import { getDashboard } from "../../api/dashboard";
+import { getExportPengisianUrl } from "../../api/laporan";
 import {
-  Button,
-  Card,
-  Header,
-  LoadingScreen,
-  LogoutButton,
+    Button,
+    Card,
+    Header,
+    LoadingScreen,
+    LogoutButton,
 } from "../../components/UI";
 import { Colors, Spacing, Typography } from "../../constants/theme";
 import { useAuth } from "../../context/AuthContext";
@@ -23,6 +29,11 @@ export default function AdminDashboardScreen() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [dateFrom, setDateFrom] = useState(
+    new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+  );
+  const [dateTo, setDateTo] = useState(new Date().toISOString().split("T")[0]);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     fetchDashboard();
@@ -45,6 +56,28 @@ export default function AdminDashboardScreen() {
     router.replace("/login");
   };
 
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      const { url, token } = await getExportPengisianUrl(dateFrom, dateTo);
+      const fileName = `rekap-pengisian-${dateFrom}-${dateTo}.xlsx`;
+      const fileUri = FileSystem.cacheDirectory + fileName;
+
+      await FileSystem.downloadAsync(url, fileUri, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      Alert.alert("Berhasil", `File ${fileName} berhasil diunduh`, [
+        { text: "OK" },
+      ]);
+    } catch (error) {
+      console.log("Export error:", error);
+      Alert.alert("Gagal", "Gagal mengunduh file Excel");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) return <LoadingScreen />;
 
   return (
@@ -55,6 +88,38 @@ export default function AdminDashboardScreen() {
         showLogo
         rightAction={<LogoutButton onPress={handleLogout} />}
       />
+
+      {/* Date Range & Export Toolbar */}
+      <View style={styles.exportToolbar}>
+        <View style={styles.dateRangeGroup}>
+          <View style={styles.dateField}>
+            <Text style={styles.dateLabel}>Dari:</Text>
+            <TextInput
+              style={styles.dateInput}
+              placeholder="YYYY-MM-DD"
+              value={dateFrom}
+              onChangeText={setDateFrom}
+              placeholderTextColor="#9ca3af"
+            />
+          </View>
+          <View style={styles.dateField}>
+            <Text style={styles.dateLabel}>Sampai:</Text>
+            <TextInput
+              style={styles.dateInput}
+              placeholder="YYYY-MM-DD"
+              value={dateTo}
+              onChangeText={setDateTo}
+              placeholderTextColor="#9ca3af"
+            />
+          </View>
+        </View>
+        <Button
+          title="📥 Export"
+          onPress={handleExportExcel}
+          loading={exporting}
+          disabled={exporting}
+        />
+      </View>
 
       <ScrollView
         style={styles.scroll}
@@ -71,196 +136,236 @@ export default function AdminDashboardScreen() {
         }
       >
         {/* Antrean Hari Ini */}
-        <Text style={styles.sectionTitle}>📋 Antrean Hari Ini</Text>
+        <View style={styles.sectionTitleRow}>
+          <MaterialIcons
+            name="assignment"
+            size={20}
+            color={Colors.textPrimary}
+          />
+          <Text style={styles.sectionTitle}>Antrean Hari Ini</Text>
+        </View>
         <View style={styles.grid}>
           <StatCard
             label="Total"
             value={data?.antrean?.hari_ini?.total}
             color={Colors.primary}
-            icon="📊"
+            icon="bar-chart"
           />
           <StatCard
             label="Menunggu"
             value={data?.antrean?.hari_ini?.menunggu}
             color={Colors.warning}
-            icon="⏳"
+            icon="hourglass-bottom"
           />
           <StatCard
             label="Dilayani"
             value={data?.antrean?.hari_ini?.dilayani}
             color={Colors.info}
-            icon="⚙️"
+            icon="build"
           />
           <StatCard
             label="Selesai"
             value={data?.antrean?.hari_ini?.selesai}
             color={Colors.success}
-            icon="✅"
+            icon="done"
           />
         </View>
 
         {/* Antrean Bulan Ini */}
-        <Text style={styles.sectionTitle}>📅 Antrean Bulan Ini</Text>
+        <View style={styles.sectionTitleRow}>
+          <MaterialIcons
+            name="calendar-today"
+            size={20}
+            color={Colors.textPrimary}
+          />
+          <Text style={styles.sectionTitle}>Antrean Bulan Ini</Text>
+        </View>
         <View style={styles.grid}>
           <StatCard
             label="Total"
             value={data?.antrean?.bulan_ini?.total}
             color={Colors.primary}
-            icon="📊"
+            icon="bar-chart"
             wide
           />
           <StatCard
             label="Selesai"
             value={data?.antrean?.bulan_ini?.selesai}
             color={Colors.success}
-            icon="✅"
+            icon="done"
             wide
           />
           <StatCard
             label="Batal"
             value={data?.antrean?.bulan_ini?.batal}
             color={Colors.danger}
-            icon="❌"
+            icon="cancel"
             wide
           />
         </View>
 
         {/* Laporan */}
-        <Text style={styles.sectionTitle}>📝 Laporan Ketidaksesuaian</Text>
+        <View style={styles.sectionTitleRow}>
+          <MaterialIcons name="note" size={20} color={Colors.textPrimary} />
+          <Text style={styles.sectionTitle}>Laporan Ketidaksesuaian</Text>
+        </View>
         <View style={styles.grid}>
           <StatCard
             label="Total"
             value={data?.laporan?.total}
             color={Colors.primary}
-            icon="📋"
+            icon="clipboard"
           />
           <StatCard
             label="Menunggu"
             value={data?.laporan?.terkirim}
             color={Colors.warning}
-            icon="⏳"
+            icon="hourglass-bottom"
           />
           <StatCard
             label="Diverifikasi"
             value={data?.laporan?.diverifikasi}
             color={Colors.success}
-            icon="✅"
+            icon="done"
           />
           <StatCard
             label="Ditolak"
             value={data?.laporan?.ditolak}
             color={Colors.danger}
-            icon="❌"
+            icon="cancel"
           />
         </View>
 
         {/* Per Klasifikasi */}
-        <Text style={styles.sectionTitle}>🏷️ Laporan per Klasifikasi</Text>
+        <View style={styles.sectionTitleRow}>
+          <MaterialIcons name="label" size={20} color={Colors.textPrimary} />
+          <Text style={styles.sectionTitle}>Laporan per Klasifikasi</Text>
+        </View>
         <Card style={styles.klasifikasiCard}>
           {[
             {
               label: "Keselamatan",
               key: "keselamatan",
-              icon: "⛑️",
+              icon: "health-and-safety",
+              isMaterialCommunity: true,
               color: Colors.danger,
             },
             {
               label: "Lingkungan",
               key: "lingkungan",
-              icon: "🌿",
+              icon: "leaf",
+              isMaterialCommunity: true,
               color: Colors.success,
             },
             {
               label: "Kualitas",
               key: "kualitas",
-              icon: "🎯",
+              icon: "target",
+              isMaterialCommunity: true,
               color: Colors.info,
             },
             {
               label: "Prosedur",
               key: "prosedur",
-              icon: "📋",
+              icon: "assignment",
+              isMaterialCommunity: false,
               color: Colors.warning,
             },
             {
               label: "Lainnya",
               key: "lainnya",
-              icon: "📌",
+              icon: "pushpin",
+              isMaterialCommunity: true,
               color: Colors.textSecondary,
             },
-          ].map((item, index, arr) => (
-            <View
-              key={item.key}
-              style={[
-                styles.klasifikasiRow,
-                index < arr.length - 1 && styles.klasifikasiRowBorder,
-              ]}
-            >
-              <Text style={styles.klasifikasiIcon}>{item.icon}</Text>
-              <Text style={styles.klasifikasiLabel}>{item.label}</Text>
+          ].map((item, index, arr) => {
+            const IconComponent = item.isMaterialCommunity
+              ? MaterialCommunityIcons
+              : MaterialIcons;
+            return (
               <View
+                key={item.key}
                 style={[
-                  styles.klasifikasiCount,
-                  { backgroundColor: item.color + "20" },
+                  styles.klasifikasiRow,
+                  index < arr.length - 1 && styles.klasifikasiRowBorder,
                 ]}
               >
-                <Text style={[styles.klasifikasiValue, { color: item.color }]}>
-                  {data?.laporan?.per_klasifikasi?.[item.key] ?? 0}
-                </Text>
+                <IconComponent
+                  name={item.icon}
+                  size={20}
+                  color={item.color}
+                  style={styles.klasifikasiIcon}
+                />
+                <Text style={styles.klasifikasiLabel}>{item.label}</Text>
+                <View
+                  style={[
+                    styles.klasifikasiCount,
+                    { backgroundColor: item.color + "20" },
+                  ]}
+                >
+                  <Text
+                    style={[styles.klasifikasiValue, { color: item.color }]}
+                  >
+                    {data?.laporan?.per_klasifikasi?.[item.key] ?? 0}
+                  </Text>
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </Card>
 
         {/* User */}
-        <Text style={styles.sectionTitle}>👥 Data Pengguna</Text>
+        <View style={styles.sectionTitleRow}>
+          <MaterialIcons name="group" size={20} color={Colors.textPrimary} />
+          <Text style={styles.sectionTitle}>Data Pengguna</Text>
+        </View>
         <View style={styles.grid}>
           <StatCard
             label="Total User"
             value={data?.user?.total}
             color={Colors.primary}
-            icon="👥"
+            icon="group"
           />
           <StatCard
             label="Aktif"
             value={data?.user?.aktif}
             color={Colors.success}
-            icon="✅"
+            icon="done"
           />
           <StatCard
             label="Operator"
             value={data?.user?.per_role?.operator}
             color={Colors.info}
-            icon="👷"
+            icon="construction"
           />
           <StatCard
             label="Supir"
             value={data?.user?.per_role?.supir}
             color={Colors.warning}
-            icon="🚛"
+            icon="local-shipping"
           />
         </View>
 
         {/* Quick Actions */}
-        <Text style={styles.sectionTitle}>⚡ Aksi Cepat</Text>
+        <View style={styles.sectionTitleRow}>
+          <MaterialIcons name="flash-on" size={20} color={Colors.textPrimary} />
+          <Text style={styles.sectionTitle}>Aksi Cepat</Text>
+        </View>
         <View style={styles.quickActions}>
           <Button
             title="Lihat Semua Antrean"
-            icon="📋"
             variant="primary"
             onPress={() => router.push("/admin/antrean")}
             style={styles.quickBtn}
           />
           <Button
             title="Verifikasi Laporan"
-            icon="📝"
             variant="secondary"
             onPress={() => router.push("/admin/laporan")}
             style={styles.quickBtn}
           />
           <Button
             title="Kelola Pengguna"
-            icon="👥"
             variant="ghost"
             onPress={() => router.push("/admin/users")}
             style={styles.quickBtn}
@@ -277,7 +382,7 @@ function StatCard({ label, value, color, icon, wide }) {
   return (
     <View style={[styles.statCard, wide && styles.statCardWide]}>
       <View style={[styles.statIconWrapper, { backgroundColor: color + "15" }]}>
-        <Text style={styles.statIcon}>{icon}</Text>
+        <MaterialIcons name={icon} size={28} color={color} />
       </View>
       <Text style={[styles.statValue, { color }]}>{value ?? 0}</Text>
       <Text style={styles.statLabel}>{label}</Text>
@@ -287,11 +392,49 @@ function StatCard({ label, value, color, icon, wide }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  exportToolbar: {
+    backgroundColor: Colors.white,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    gap: 10,
+  },
+  dateRangeGroup: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8,
+  },
+  dateField: {
+    flex: 1,
+  },
+  dateLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: Colors.textSecondary,
+    marginBottom: 4,
+  },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
+    color: Colors.textPrimary,
+  },
   scroll: { flex: 1 },
   content: { padding: Spacing.md },
   sectionTitle: {
     ...Typography.h4,
     color: Colors.textPrimary,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     marginTop: Spacing.md,
     marginBottom: Spacing.sm,
   },
@@ -315,7 +458,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
-  statIcon: { fontSize: 22 },
   statValue: { fontSize: 28, fontWeight: "bold", marginBottom: 2 },
   statLabel: {
     ...Typography.caption,
@@ -334,7 +476,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },
-  klasifikasiIcon: { fontSize: 20, marginRight: 10 },
+  klasifikasiIcon: { marginRight: 10 },
   klasifikasiLabel: { flex: 1, ...Typography.body, color: Colors.textPrimary },
   klasifikasiCount: {
     paddingHorizontal: 12,

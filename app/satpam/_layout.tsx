@@ -1,5 +1,6 @@
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Tabs } from "expo-router";
-import { Text } from "react-native";
 
 export default function SatpamLayout() {
   return (
@@ -22,8 +23,8 @@ export default function SatpamLayout() {
         name="qr"
         options={{
           title: "Barcode",
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 22, color }}>📊</Text>
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="qr-code-2" size={size} color={color} />
           ),
         }}
       />
@@ -31,8 +32,12 @@ export default function SatpamLayout() {
         name="validasi"
         options={{
           title: "Validasi",
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 22, color }}>✅</Text>
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="check-circle"
+              size={size}
+              color={color}
+            />
           ),
         }}
       />
@@ -40,8 +45,17 @@ export default function SatpamLayout() {
         name="antrean"
         options={{
           title: "Monitor",
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 22, color }}>👁️</Text>
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="visibility" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="laporan"
+        options={{
+          title: "Laporan",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="assignment" size={size} color={color} />
           ),
         }}
       />

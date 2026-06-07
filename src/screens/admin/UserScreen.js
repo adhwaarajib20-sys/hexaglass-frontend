@@ -1,3 +1,5 @@
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -72,10 +74,30 @@ export default function AdminUserScreen() {
   };
 
   const roleConfig = {
-    admin: { color: Colors.danger, icon: "👑", label: "Admin" },
-    operator: { color: Colors.info, icon: "👷", label: "Operator" },
-    satpam: { color: Colors.warning, icon: "🛡️", label: "Satpam" },
-    supir: { color: Colors.success, icon: "🚛", label: "Supir" },
+    admin: {
+      color: Colors.danger,
+      icon: "crown",
+      isMaterialCommunity: true,
+      label: "Admin",
+    },
+    operator: {
+      color: Colors.info,
+      icon: "hard-hat",
+      isMaterialCommunity: true,
+      label: "Operator",
+    },
+    satpam: {
+      color: Colors.warning,
+      icon: "shield-account",
+      isMaterialCommunity: true,
+      label: "Satpam",
+    },
+    supir: {
+      color: Colors.success,
+      icon: "local-shipping",
+      isMaterialCommunity: false,
+      label: "Supir",
+    },
   };
 
   const filters = ["semua", "admin", "operator", "satpam", "supir"];
@@ -85,7 +107,8 @@ export default function AdminUserScreen() {
   const renderItem = ({ item }) => {
     const role = roleConfig[item.role] ?? {
       color: Colors.textSecondary,
-      icon: "👤",
+      icon: "person",
+      isMaterialCommunity: false,
       label: item.role,
     };
     return (
@@ -99,10 +122,32 @@ export default function AdminUserScreen() {
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{item.name}</Text>
             <Text style={styles.userEmail}>{item.email}</Text>
-            {item.no_hp && <Text style={styles.userHp}>📞 {item.no_hp}</Text>}
+            {item.no_hp && (
+              <View style={styles.phoneRow}>
+                <MaterialIcons
+                  name="phone"
+                  size={14}
+                  color={Colors.textSecondary}
+                />
+                <Text style={styles.userHp}>{item.no_hp}</Text>
+              </View>
+            )}
           </View>
           <View style={styles.badges}>
-            <Badge label={`${role.icon} ${role.label}`} color={role.color} />
+            <View style={styles.roleBadge}>
+              {role.isMaterialCommunity ? (
+                <MaterialCommunityIcons
+                  name={role.icon}
+                  size={16}
+                  color={role.color}
+                />
+              ) : (
+                <MaterialIcons name={role.icon} size={16} color={role.color} />
+              )}
+              <Text style={[styles.roleBadgeText, { color: role.color }]}>
+                {role.label}
+              </Text>
+            </View>
             <View style={{ marginTop: 4 }}>
               <Badge
                 label={item.status === "aktif" ? "● Aktif" : "○ Nonaktif"}
@@ -120,7 +165,7 @@ export default function AdminUserScreen() {
 
         <Button
           title={item.status === "aktif" ? "Nonaktifkan Akun" : "Aktifkan Akun"}
-          icon={item.status === "aktif" ? "🔒" : "🔓"}
+          icon={item.status === "aktif" ? "lock" : "lock-open"}
           variant={item.status === "aktif" ? "danger" : "success"}
           size="sm"
           onPress={() => handleToggle(item.id, item.name, item.status)}
@@ -159,7 +204,21 @@ export default function AdminUserScreen() {
       <View style={styles.statsRow}>
         {Object.entries(roleConfig).map(([key, val]) => (
           <View key={key} style={styles.statItem}>
-            <Text style={styles.statIcon}>{val.icon}</Text>
+            {val.isMaterialCommunity ? (
+              <MaterialCommunityIcons
+                name={val.icon}
+                size={20}
+                color={val.color}
+                style={{ marginBottom: 4 }}
+              />
+            ) : (
+              <MaterialIcons
+                name={val.icon}
+                size={20}
+                color={val.color}
+                style={{ marginBottom: 4 }}
+              />
+            )}
             <Text style={[styles.statNum, { color: val.color }]}>
               {users.filter((u) => u.role === key).length}
             </Text>
@@ -184,7 +243,7 @@ export default function AdminUserScreen() {
         }
         ListEmptyComponent={
           <EmptyState
-            icon="👥"
+            icon="group"
             title="Tidak Ada Pengguna"
             subtitle="Belum ada pengguna yang terdaftar"
           />

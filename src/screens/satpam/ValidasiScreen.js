@@ -1,24 +1,25 @@
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
-  FlatList,
-  Modal,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    Alert,
+    FlatList,
+    Modal,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import api from "../../api/config";
 import {
-  Button,
-  Card,
-  EmptyState,
-  Header,
-  LoadingScreen,
-  LogoutButton,
-  StatusBadge,
+    Button,
+    Card,
+    EmptyState,
+    Header,
+    LoadingScreen,
+    LogoutButton,
+    StatusBadge,
 } from "../../components/UI";
 import { Colors, Radius, Spacing, Typography } from "../../constants/theme";
 import { useAuth } from "../../context/AuthContext";
@@ -29,24 +30,27 @@ export default function ValidasiScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [estimasiModalVisible, setEstimasiModalVisible] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
+  const [selectedNama, setSelectedNama] = useState("");
   const [alasan, setAlasan] = useState("");
+  const [estimasiMenit, setEstimasiMenit] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    console.log("📱 ValidasiScreen mounted - calling fetchAntrean");
+    console.log("ValidasiScreen mounted - calling fetchAntrean");
     fetchAntrean();
   }, []);
 
   const fetchAntrean = async () => {
     try {
-      console.log("📥 Fetching pending antrians from /satpam/antrean-pending");
+      console.log("Fetching pending antrians from /satpam/antrean-pending");
       const res = await api.get("/satpam/antrean-pending");
-      console.log("✅ Antrians fetched successfully:", res.data);
+      console.log("Antrians fetched successfully:", res.data);
       setAntrean(res.data.data);
     } catch (e) {
-      console.log("❌ Error fetching antrians:", e.message);
-      console.log("📋 Error response:", e.response?.data);
+      console.log("Error fetching antrians:", e.message);
+      console.log("Error response:", e.response?.data);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -59,54 +63,50 @@ export default function ValidasiScreen() {
   };
 
   const handleSetujui = (id, nama) => {
-    console.log("\n🎯🎯🎯 handleSetujui CALLED with id:", id, "nama:", nama);
-    Alert.alert(
-      "✅ Konfirmasi Persetujuan",
-      `Setujui antrean atas nama ${nama}?`,
-      [
-        {
-          text: "Batal",
-          style: "cancel",
-          onPress: () => console.log("❌ User clicked Batal in alert"),
-        },
-        {
-          text: "Setujui",
-          onPress: async () => {
-            setSubmitting(true);
-            console.log("\n🟢🟢🟢 Alert Setujui button PRESSED for id:", id);
-            try {
-              console.log("📤 Sending POST request to /satpam/validasi/" + id);
-              const res = await api.post(`/satpam/validasi/${id}`, {
-                status_validasi: "disetujui",
-              });
-              console.log("✅ API Response received:", res.data);
-              if (res.data?.status) {
-                Alert.alert("✅ Berhasil", "Antrean telah disetujui");
-                fetchAntrean();
-              } else {
-                console.log("⚠️ API returned status false:", res.data);
-                Alert.alert(
-                  "❌ Gagal",
-                  res.data?.message ?? "Gagal menyetujui antrean",
-                );
-              }
-            } catch (e) {
-              console.log("❌ Error setujui:", e.message);
-              console.log("📋 Error response data:", e.response?.data);
-              console.log("📋 Full error:", JSON.stringify(e, null, 2));
-              Alert.alert(
-                "❌ Gagal",
-                e.response?.data?.message ??
-                  e.message ??
-                  "Gagal menyetujui antrean",
-              );
-            } finally {
-              setSubmitting(false);
-            }
-          },
-        },
-      ],
-    );
+    // Show estimasi input modal instead of alert
+    setSelectedId(id);
+    setSelectedNama(nama);
+    setEstimasiMenit("");
+    setEstimasiModalVisible(true);
+  };
+
+  const handleKonfirmasiSetujui = async () => {
+    setSubmitting(true);
+    console.log("Starting handleKonfirmasiSetujui for id:", selectedId);
+
+    // Validate estimasi input
+    const estimasi = estimasiMenit.trim() ? parseInt(estimasiMenit, 10) : null;
+    if (estimasi && (isNaN(estimasi) || estimasi < 1 || estimasi > 120)) {
+      Alert.alert("Validasi", "Estimasi harus antara 1 - 120 menit");
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      console.log("Sending POST request to /satpam/validasi/" + selectedId);
+      const res = await api.post(`/satpam/validasi/${selectedId}`, {
+        status_validasi: "disetujui",
+        estimasi_validasi_satpam: estimasi,
+      });
+      console.log("API Response received:", res.data);
+      if (res.data?.status) {
+        Alert.alert("Berhasil", "Antrean telah disetujui");
+        setEstimasiModalVisible(false);
+        fetchAntrean();
+      } else {
+        console.log("API returned status false:", res.data);
+        Alert.alert("Gagal", res.data?.message ?? "Gagal menyetujui antrean");
+      }
+    } catch (e) {
+      console.log("Error setujui:", e.message);
+      console.log("Error response data:", e.response?.data);
+      Alert.alert(
+        "Gagal",
+        e.response?.data?.message ?? e.message ?? "Gagal menyetujui antrean",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleTolak = (id) => {
@@ -117,28 +117,28 @@ export default function ValidasiScreen() {
 
   const handleKonfirmasiTolak = async () => {
     setSubmitting(true);
-    console.log("🔵 Starting handleKonfirmasiTolak for id:", selectedId);
+    console.log("Starting handleKonfirmasiTolak for id:", selectedId);
     try {
-      console.log("📤 Sending POST request to /satpam/validasi/" + selectedId);
+      console.log("Sending POST request to /satpam/validasi/" + selectedId);
       const res = await api.post(`/satpam/validasi/${selectedId}`, {
         status_validasi: "ditolak",
         alasan_penolakan: alasan,
       });
-      console.log("✅ API Response received:", res.data);
+      console.log("API Response received:", res.data);
       if (res.data?.status) {
-        Alert.alert("✅ Berhasil", "Antrean telah ditolak");
+        Alert.alert("Berhasil", "Antrean telah ditolak");
         setModalVisible(false);
         fetchAntrean();
       } else {
-        console.log("⚠️ API returned status false:", res.data);
-        Alert.alert("❌ Gagal", res.data?.message ?? "Gagal menolak antrean");
+        console.log("API returned status false:", res.data);
+        Alert.alert("Gagal", res.data?.message ?? "Gagal menolak antrean");
       }
     } catch (e) {
-      console.log("❌ Error tolak:", e.message);
-      console.log("📋 Error response data:", e.response?.data);
-      console.log("📋 Full error:", JSON.stringify(e, null, 2));
+      console.log("Error tolak:", e.message);
+      console.log("Error response data:", e.response?.data);
+      console.log("Full error:", JSON.stringify(e, null, 2));
       Alert.alert(
-        "❌ Gagal",
+        "Gagal",
         e.response?.data?.message ?? e.message ?? "Gagal menolak antrean",
       );
     } finally {
@@ -152,12 +152,19 @@ export default function ValidasiScreen() {
       <View style={styles.cardHeader}>
         <View>
           <Text style={styles.nomor}>{item.nomor_antrean}</Text>
-          <Text style={styles.waktu}>
-            🕐{" "}
-            {item.waktu_daftar
-              ? new Date(item.waktu_daftar).toLocaleTimeString("id-ID")
-              : "-"}
-          </Text>
+          <View style={styles.waktuRow}>
+            <MaterialIcons
+              name="access-time"
+              size={14}
+              color={Colors.textSecondary}
+              style={{ marginRight: 4 }}
+            />
+            <Text style={styles.waktu}>
+              {item.waktu_daftar
+                ? new Date(item.waktu_daftar).toLocaleTimeString("id-ID")
+                : "-"}
+            </Text>
+          </View>
         </View>
         <StatusBadge status="menunggu_validasi" type="validasi" />
       </View>
@@ -167,28 +174,32 @@ export default function ValidasiScreen() {
       {/* Data Kendaraan */}
       <View style={styles.dataGrid}>
         <DataRow
-          icon="👤"
+          icon="person"
           label="Nama Supir"
           value={item.kendaraan?.nama_supir}
         />
-        <DataRow icon="📞" label="No. HP" value={item.kendaraan?.no_hp_supir} />
         <DataRow
-          icon="🚗"
+          icon="phone"
+          label="No. HP"
+          value={item.kendaraan?.no_hp_supir}
+        />
+        <DataRow
+          icon="directions-car"
           label="No. Polisi"
           value={item.kendaraan?.nomor_polisi}
         />
         <DataRow
-          icon="🚛"
+          icon="local-shipping"
           label="Jenis"
           value={item.kendaraan?.jenis_kendaraan}
         />
         <DataRow
-          icon="⛽"
+          icon="local-gas-station"
           label="Kapasitas"
           value={item.kendaraan?.kapasitas_tangki}
         />
         <DataRow
-          icon="🏢"
+          icon="business"
           label="Perusahaan"
           value={item.kendaraan?.perusahaan ?? "-"}
         />
@@ -200,11 +211,11 @@ export default function ValidasiScreen() {
       <View style={styles.actionRow}>
         <Button
           title="Setujui"
-          icon="✅"
+          icon="check-circle"
           variant="success"
           size="sm"
           onPress={() => {
-            console.log("\n🔘🔘🔘 SETUJUI BUTTON PRESSED - item.id:", item.id);
+            console.log("SETUJUI BUTTON PRESSED - item.id:", item.id);
             handleSetujui(item.id, item.kendaraan?.nama_supir);
           }}
           style={styles.halfBtn}
@@ -214,11 +225,11 @@ export default function ValidasiScreen() {
         />
         <Button
           title="Tolak"
-          icon="❌"
+          icon="close-circle"
           variant="danger"
           size="sm"
           onPress={() => {
-            console.log("\n🔘🔘🔘 TOLAK BUTTON PRESSED - item.id:", item.id);
+            console.log("TOLAK BUTTON PRESSED - item.id:", item.id);
             handleTolak(item.id);
           }}
           style={styles.halfBtn}
@@ -251,9 +262,12 @@ export default function ValidasiScreen() {
             borderBottomColor: "#ffdbac",
           }}
         >
-          <Text style={{ fontSize: 12, color: "#856404", fontWeight: "600" }}>
-            ℹ️ Tidak ada antrean. Pastikan data sudah di-register oleh supir.
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <MaterialIcons name="info" size={16} color="#856404" />
+            <Text style={{ fontSize: 12, color: "#856404", fontWeight: "600" }}>
+              Tidak ada antrean. Pastikan data sudah di-register oleh supir.
+            </Text>
+          </View>
         </View>
       )}
 
@@ -266,10 +280,13 @@ export default function ValidasiScreen() {
             borderBottomColor: "#c3e6cb",
           }}
         >
-          <Text style={{ fontSize: 12, color: "#155724", fontWeight: "600" }}>
-            ✅ Ada {antrean.length} antrean menunggu validasi. Klik Setujui atau
-            Tolak.
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <MaterialIcons name="check-circle" size={16} color="#155724" />
+            <Text style={{ fontSize: 12, color: "#155724", fontWeight: "600" }}>
+              Ada {antrean.length} antrean menunggu validasi. Klik Setujui atau
+              Tolak.
+            </Text>
+          </View>
         </View>
       )}
 
@@ -289,7 +306,7 @@ export default function ValidasiScreen() {
         }
         ListEmptyComponent={
           <EmptyState
-            icon="✅"
+            icon="check-circle"
             title="Semua Antrean Tervalidasi"
             subtitle="Tidak ada antrean yang menunggu validasi saat ini"
           />
@@ -301,7 +318,10 @@ export default function ValidasiScreen() {
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>❌ Alasan Penolakan</Text>
+            <View style={styles.modalHeader}>
+              <MaterialIcons name="cancel" size={24} color={Colors.danger} />
+              <Text style={styles.modalTitle}>Alasan Penolakan</Text>
+            </View>
             <Text style={styles.modalSubtitle}>
               Berikan alasan yang jelas agar supir dapat memahami penolakan ini
             </Text>
@@ -335,6 +355,57 @@ export default function ValidasiScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Modal Estimasi Validasi */}
+      <Modal visible={estimasiModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <MaterialIcons name="schedule" size={24} color={Colors.primary} />
+              <Text style={styles.modalTitle}>Estimasi Waktu Validasi</Text>
+            </View>
+            <Text style={styles.modalSubtitle}>
+              Berapa menit estimasi untuk memvalidasi antrean atas nama:{"\n"}
+              <Text style={{ fontWeight: "bold" }}>{selectedNama}</Text>
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Contoh: 15 (1-120 menit)"
+              placeholderTextColor={Colors.textLight}
+              value={estimasiMenit}
+              onChangeText={setEstimasiMenit}
+              keyboardType="number-pad"
+              maxLength={3}
+            />
+            <Text style={styles.estimasiHint}>
+              {estimasiMenit
+                ? `Estimasi: ${estimasiMenit} menit`
+                : "Boleh kosong jika tidak ada estimasi"}
+            </Text>
+            <View style={styles.modalActions}>
+              <Button
+                title="Batal"
+                variant="ghost"
+                size="sm"
+                onPress={() => setEstimasiModalVisible(false)}
+                style={styles.halfBtn}
+                fullWidth={false}
+                disabled={submitting}
+              />
+              <Button
+                title="Setujui"
+                variant="success"
+                size="sm"
+                onPress={handleKonfirmasiSetujui}
+                style={styles.halfBtn}
+                fullWidth={false}
+                loading={submitting}
+                disabled={submitting}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -342,7 +413,14 @@ export default function ValidasiScreen() {
 function DataRow({ icon, label, value }) {
   return (
     <View style={dataStyles.row}>
-      <Text style={dataStyles.icon}>{icon}</Text>
+      {icon && (
+        <MaterialIcons
+          name={icon}
+          size={14}
+          color={Colors.primary}
+          style={dataStyles.iconView}
+        />
+      )}
       <Text style={dataStyles.label}>{label}</Text>
       <Text style={dataStyles.value}>{value}</Text>
     </View>
@@ -351,7 +429,7 @@ function DataRow({ icon, label, value }) {
 
 const dataStyles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", paddingVertical: 5 },
-  icon: { fontSize: 14, width: 24 },
+  iconView: { width: 24, marginRight: 2 },
   label: { ...Typography.caption, color: Colors.textSecondary, width: 90 },
   value: {
     ...Typography.bodySmall,
@@ -371,7 +449,8 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   nomor: { ...Typography.h4, color: Colors.primary },
-  waktu: { ...Typography.caption, color: Colors.textSecondary, marginTop: 2 },
+  waktuRow: { flexDirection: "row", alignItems: "center", marginTop: 2 },
+  waktu: { ...Typography.caption, color: Colors.textSecondary },
   divider: {
     height: 1,
     backgroundColor: Colors.borderLight,
@@ -394,6 +473,12 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     paddingBottom: 40,
   },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: Spacing.md,
+  },
   modalTitle: { ...Typography.h3, color: Colors.textPrimary, marginBottom: 4 },
   modalSubtitle: {
     ...Typography.bodySmall,
@@ -410,6 +495,12 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: 15,
     marginBottom: Spacing.md,
+  },
+  estimasiHint: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.md,
+    fontStyle: "italic",
   },
   modalActions: { flexDirection: "row", gap: 8 },
 });

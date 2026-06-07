@@ -1,20 +1,28 @@
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { Picker } from "@react-native-picker/picker";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
-import { daftarAntrean, validasiBarcode } from "../../api/sesi";
+import {
+    daftarAntrean,
+    daftarPerusahaan,
+    jenisKendaraan,
+    validasiBarcode,
+} from "../../api/sesi";
 import { Colors } from "../../constants/theme";
 import { useAuth } from "../../context/AuthContext";
 
@@ -28,14 +36,43 @@ export default function ScanScreen() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [copied, setCopied] = useState(false);
+
+  // Dropdown data
+  const [jenisKendaraanList, setJenisKendaraanList] = useState([]);
+  const [perusahaanList, setPerusahaanList] = useState([]);
+  const [loadingDropdown, setLoadingDropdown] = useState(false);
+  const [perusahaanManual, setPerusahaanManual] = useState(""); // Manual perusahaan input
+  const [perusahaanSearch, setPerusahaanSearch] = useState(""); // Search filter untuk perusahaan
+
   const [form, setForm] = useState({
     nama_supir: "",
     no_hp_supir: "",
     nomor_polisi: "",
     jenis_kendaraan: "",
     kapasitas_tangki: "",
-    perusahaan: "",
+    perusahaan_id: "",
   });
+
+  // Fetch dropdown data
+  useEffect(() => {
+    const fetchDropdownData = async () => {
+      setLoadingDropdown(true);
+      try {
+        const [resJenis, resPerusahaan] = await Promise.all([
+          jenisKendaraan(),
+          daftarPerusahaan(),
+        ]);
+        setJenisKendaraanList(resJenis.data?.data || []);
+        setPerusahaanList(resPerusahaan.data?.data || []);
+      } catch (e) {
+        console.log("Error fetching dropdown data:", e);
+      } finally {
+        setLoadingDropdown(false);
+      }
+    };
+
+    fetchDropdownData();
+  }, []);
 
   const handleLogout = async () => {
     Alert.alert("Konfirmasi Logout", "Apakah Anda yakin ingin keluar?", [
@@ -63,22 +100,22 @@ export default function ScanScreen() {
       } else {
         // Handle case where API returns status false or message
         Alert.alert(
-          "❌ Barcode Tidak Valid",
+          "Barcode Tidak Valid",
           res.data?.message ?? "Kode tidak valid atau sudah digunakan",
           [
-            { text: "🔄 Scan Ulang", onPress: () => setScanned(false) },
-            { text: "⌨️ Input Manual", onPress: () => setStep("manual") },
+            { text: "Scan Ulang", onPress: () => setScanned(false) },
+            { text: "Input Manual", onPress: () => setStep("manual") },
           ],
         );
       }
     } catch (error) {
       Alert.alert(
-        "❌ Barcode Tidak Valid",
+        "Barcode Tidak Valid",
         error.response?.data?.message ??
           "Kode tidak valid atau sudah digunakan",
         [
-          { text: "🔄 Scan Ulang", onPress: () => setScanned(false) },
-          { text: "⌨️ Input Manual", onPress: () => setStep("manual") },
+          { text: "Scan Ulang", onPress: () => setScanned(false) },
+          { text: "Input Manual", onPress: () => setStep("manual") },
         ],
       );
     } finally {
@@ -100,13 +137,13 @@ export default function ScanScreen() {
       } else {
         // Handle case where API returns status false or message
         Alert.alert(
-          "❌ Kode Tidak Valid",
+          "Kode Tidak Valid",
           res.data?.message ?? "Kode tidak valid atau sudah kadaluarsa",
         );
       }
     } catch (error) {
       Alert.alert(
-        "❌ Kode Tidak Valid",
+        "Kode Tidak Valid",
         error.response?.data?.message ??
           "Kode tidak valid atau sudah kadaluarsa",
       );
@@ -123,26 +160,47 @@ export default function ScanScreen() {
       "jenis_kendaraan",
       "kapasitas_tangki",
     ];
-    const missing = required.filter((k) => !form[k].trim());
+    const missing = required.filter((k) => !form[k].toString().trim());
     if (missing.length > 0) {
+      Alert.alert("Data Tidak Lengkap", "Semua field bertanda * wajib diisi");
+      return;
+    }
+
+    // Validasi kapasitas tangki hanya angka
+    if (isNaN(form.kapasitas_tangki) || form.kapasitas_tangki <= 0) {
       Alert.alert(
-        "⚠️ Data Tidak Lengkap",
-        "Semua field bertanda * wajib diisi",
+        "Validasi Error",
+        "Kapasitas tangki harus berupa angka positif",
       );
       return;
     }
+
     setLoading(true);
     try {
-      const res = await daftarAntrean({
+      const payload = {
         kode_barcode: kodeBarcode,
-        ...form,
+        nama_supir: form.nama_supir,
+        no_hp_supir: form.no_hp_supir,
         nomor_polisi: form.nomor_polisi.toUpperCase().trim(),
-      });
+        jenis_kendaraan: form.jenis_kendaraan,
+        kapasitas_tangki: form.kapasitas_tangki,
+      };
+
+      // Kirim perusahaan_id jika dari dropdown, atau perusahaan jika manual input
+      if (form.perusahaan_id) {
+        payload.perusahaan_id = form.perusahaan_id;
+      } else if (perusahaanManual.trim()) {
+        payload.perusahaan = perusahaanManual.trim();
+      } else {
+        payload.perusahaan_id = null;
+      }
+
+      const res = await daftarAntrean(payload);
       setResult(res.data.data);
       setStep("result");
     } catch (error) {
       Alert.alert(
-        "❌ Gagal",
+        "Gagal",
         error.response?.data?.message ?? "Gagal mendaftar antrean",
       );
     } finally {
@@ -163,13 +221,15 @@ export default function ScanScreen() {
     setInputManual("");
     setResult(null);
     setCopied(false);
+    setPerusahaanManual("");
+    setPerusahaanSearch("");
     setForm({
       nama_supir: "",
       no_hp_supir: "",
       nomor_polisi: "",
       jenis_kendaraan: "",
       kapasitas_tangki: "",
-      perusahaan: "",
+      perusahaan_id: "",
     });
   };
 
@@ -214,6 +274,11 @@ export default function ScanScreen() {
   const Header = ({ title, subtitle, showBack, onBack }) => (
     <View style={styles.header}>
       <View style={styles.headerLeft}>
+        <Image
+          source={require("../../../assets/images/logo.png")}
+          style={{ width: 36, height: 36, marginRight: 8 }}
+          resizeMode="contain"
+        />
         {showBack && (
           <TouchableOpacity style={styles.backBtn} onPress={onBack}>
             <Text style={styles.backBtnText}>← Kembali</Text>
@@ -237,9 +302,16 @@ export default function ScanScreen() {
     if (!permission.granted) {
       return (
         <View style={styles.container}>
-          <Header title="Scan Barcode" subtitle={user?.name} />
+          <Header title="Scan Barcode" subtitle="Halaman Scan QR" />
           <View style={styles.center}>
-            <Text style={styles.bigIcon}>📷</Text>
+            <View style={{ marginBottom: 20 }}>
+              <MaterialIcons
+                name="qr-code-scanner"
+                size={64}
+                color={Colors.primary}
+                style={{ textAlign: "center" }}
+              />
+            </View>
             <Text style={styles.permissionTitle}>Izin Kamera Diperlukan</Text>
             <Text style={styles.permissionSubtitle}>
               Aplikasi membutuhkan akses kamera untuk scan barcode dari satpam
@@ -254,7 +326,7 @@ export default function ScanScreen() {
               style={styles.secondaryBtn}
               onPress={() => setStep("manual")}
             >
-              <Text style={styles.secondaryBtnText}>⌨️ Input Kode Manual</Text>
+              <Text style={styles.secondaryBtnText}>Input Kode Manual</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -263,13 +335,13 @@ export default function ScanScreen() {
 
     return (
       <View style={styles.container}>
-        <Header title="Scan Barcode" subtitle={user?.name} />
+        <Header title="Scan Barcode" subtitle="Halaman Scan QR" />
         <StepIndicator current="scan" />
 
         {/* Info Box */}
         <View style={styles.infoBox}>
           <Text style={styles.infoBoxText}>
-            📋 Minta barcode dari petugas satpam, lalu arahkan kamera ke barcode
+            Minta barcode dari petugas satpam, lalu arahkan kamera ke barcode
             tersebut
           </Text>
         </View>
@@ -309,7 +381,7 @@ export default function ScanScreen() {
               style={styles.primaryBtn}
               onPress={() => setScanned(false)}
             >
-              <Text style={styles.primaryBtnText}>🔄 Scan Ulang</Text>
+              <Text style={styles.primaryBtnText}>Scan Ulang</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -317,7 +389,7 @@ export default function ScanScreen() {
               onPress={() => setStep("manual")}
             >
               <Text style={styles.secondaryBtnText}>
-                ⌨️ Tidak bisa scan? Input manual
+                Tidak bisa scan? Input manual
               </Text>
             </TouchableOpacity>
           )}
@@ -341,7 +413,6 @@ export default function ScanScreen() {
           contentContainerStyle={styles.scrollContent}
         >
           <View style={styles.card}>
-            <Text style={styles.bigIcon}>🔑</Text>
             <Text style={styles.cardTitle}>Masukkan Kode Barcode</Text>
             <Text style={styles.cardSubtitle}>
               Minta kode unik dari petugas satpam jika kamera tidak bisa
@@ -365,7 +436,7 @@ export default function ScanScreen() {
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.primaryBtnText}>✓ Validasi Kode</Text>
+                <Text style={styles.primaryBtnText}>Validasi Kode</Text>
               )}
             </TouchableOpacity>
 
@@ -373,7 +444,7 @@ export default function ScanScreen() {
               style={styles.secondaryBtn}
               onPress={() => setStep("scan")}
             >
-              <Text style={styles.secondaryBtnText}>📷 Coba Scan Lagi</Text>
+              <Text style={styles.secondaryBtnText}>Coba Scan Lagi</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -383,46 +454,6 @@ export default function ScanScreen() {
 
   // ─── SCREEN: FORM ─────────────────────────────────────────
   if (step === "form") {
-    const fields = [
-      {
-        label: "Nama Supir",
-        key: "nama_supir",
-        placeholder: "Masukkan nama lengkap",
-        required: true,
-      },
-      {
-        label: "No HP",
-        key: "no_hp_supir",
-        placeholder: "Contoh: 08123456789",
-        required: true,
-        keyboard: "phone-pad",
-      },
-      {
-        label: "Nomor Polisi",
-        key: "nomor_polisi",
-        placeholder: "Contoh: B 1234 ABC",
-        required: true,
-      },
-      {
-        label: "Jenis Kendaraan",
-        key: "jenis_kendaraan",
-        placeholder: "Contoh: Truk Tangki",
-        required: true,
-      },
-      {
-        label: "Kapasitas Tangki",
-        key: "kapasitas_tangki",
-        placeholder: "Contoh: 5000 Liter",
-        required: true,
-      },
-      {
-        label: "Perusahaan",
-        key: "perusahaan",
-        placeholder: "Nama perusahaan (opsional)",
-        required: false,
-      },
-    ];
-
     return (
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -441,31 +472,286 @@ export default function ScanScreen() {
         >
           {/* Success badge */}
           <View style={styles.successBadge}>
+            <MaterialIcons
+              name="check-circle"
+              size={16}
+              color={Colors.success}
+              style={styles.successIcon}
+            />
             <Text style={styles.successBadgeText}>
-              ✅ Barcode valid! Lengkapi data kendaraan
+              Barcode valid! Lengkapi data kendaraan
             </Text>
           </View>
 
           <View style={styles.card}>
-            {fields.map((field) => (
-              <View key={field.key} style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>
-                  {field.label}
-                  {field.required && <Text style={styles.required}> *</Text>}
-                </Text>
-                <TextInput
-                  style={[
-                    styles.fieldInput,
-                    form[field.key] && styles.fieldInputFilled,
-                  ]}
-                  placeholder={field.placeholder}
-                  placeholderTextColor="#9ca3af"
-                  value={form[field.key]}
-                  onChangeText={(val) => setForm({ ...form, [field.key]: val })}
-                  keyboardType={field.keyboard ?? "default"}
-                />
+            {/* Nama Supir */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>
+                Nama Supir <Text style={styles.required}>*</Text>
+              </Text>
+              <TextInput
+                style={[
+                  styles.fieldInput,
+                  form.nama_supir && styles.fieldInputFilled,
+                ]}
+                placeholder="Nama lengkap"
+                placeholderTextColor="#9ca3af"
+                value={form.nama_supir}
+                onChangeText={(val) => setForm({ ...form, nama_supir: val })}
+              />
+            </View>
+
+            {/* No HP Supir */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>
+                No. HP Supir <Text style={styles.required}>*</Text>
+              </Text>
+              <TextInput
+                style={[
+                  styles.fieldInput,
+                  form.no_hp_supir && styles.fieldInputFilled,
+                ]}
+                placeholder="Contoh: 081234567890"
+                placeholderTextColor="#9ca3af"
+                value={form.no_hp_supir}
+                onChangeText={(val) => setForm({ ...form, no_hp_supir: val })}
+                keyboardType="phone-pad"
+              />
+            </View>
+
+            {/* Nomor Polisi */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>
+                Nomor Polisi <Text style={styles.required}>*</Text>
+              </Text>
+              <TextInput
+                style={[
+                  styles.fieldInput,
+                  form.nomor_polisi && styles.fieldInputFilled,
+                ]}
+                placeholder="Contoh: B 1234 ABC"
+                placeholderTextColor="#9ca3af"
+                value={form.nomor_polisi}
+                onChangeText={(val) => setForm({ ...form, nomor_polisi: val })}
+              />
+            </View>
+
+            {/* Jenis Kendaraan Dropdown */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>
+                Jenis Kendaraan <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={[styles.fieldInput, { paddingHorizontal: 0 }]}>
+                <Picker
+                  selectedValue={form.jenis_kendaraan}
+                  onValueChange={(val) => {
+                    // Auto-fill kapasitas tangki based on vehicle type
+                    const selectedVehicle = jenisKendaraanList.find(
+                      (v) => v.id === val,
+                    );
+                    const newForm = { ...form, jenis_kendaraan: val };
+                    if (selectedVehicle && selectedVehicle.kapasitas) {
+                      newForm.kapasitas_tangki =
+                        selectedVehicle.kapasitas.toString();
+                    }
+                    setForm(newForm);
+                  }}
+                  style={{ color: Colors.textPrimary }}
+                >
+                  <Picker.Item label="-- Pilih Jenis Kendaraan --" value="" />
+                  {jenisKendaraanList.map((item) => (
+                    <Picker.Item
+                      key={item.id}
+                      label={item.label}
+                      value={item.id}
+                    />
+                  ))}
+                </Picker>
               </View>
-            ))}
+            </View>
+
+            {/* Kapasitas Tangki - m³ */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>
+                Kapasitas Tangki (m³) <Text style={styles.required}>*</Text>
+              </Text>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: Colors.textLight,
+                  marginBottom: 8,
+                }}
+              >
+                📝 Contoh: 1m³ = 1000L
+              </Text>
+              <TextInput
+                style={[
+                  styles.fieldInput,
+                  form.kapasitas_tangki && styles.fieldInputFilled,
+                ]}
+                placeholder="Contoh: 5"
+                placeholderTextColor="#9ca3af"
+                value={form.kapasitas_tangki}
+                onChangeText={(val) =>
+                  setForm({ ...form, kapasitas_tangki: val })
+                }
+                keyboardType="decimal-pad"
+              />
+            </View>
+
+            {/* Perusahaan - Manual Input + Searchable Dropdown */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>
+                Perusahaan
+                {perusahaanList.length > 0 ? (
+                  <Text style={{ fontSize: 12, color: Colors.textLight }}>
+                    {" "}
+                    (opsional)
+                  </Text>
+                ) : null}
+              </Text>
+
+              {/* Manual Input / Selected Display */}
+              <TextInput
+                style={[
+                  styles.fieldInput,
+                  (form.perusahaan_id || perusahaanManual) &&
+                    styles.fieldInputFilled,
+                ]}
+                placeholder="Ketik atau cari perusahaan"
+                placeholderTextColor="#9ca3af"
+                value={
+                  perusahaanManual ||
+                  (form.perusahaan_id
+                    ? perusahaanList.find((p) => p.id == form.perusahaan_id)
+                        ?.nama_perusahaan || ""
+                    : "")
+                }
+                onChangeText={(val) => {
+                  setPerusahaanManual(val);
+                  setPerusahaanSearch(val);
+                  if (val.trim()) {
+                    // Jika user ketik manual, clear perusahaan_id selection
+                    setForm({ ...form, perusahaan_id: "" });
+                  }
+                }}
+                editable={true}
+              />
+
+              {/* Searchable Perusahaan List */}
+              {perusahaanList.length > 0 && (
+                <View style={styles.perusahaanDropdownContainer}>
+                  {/* Tampilkan list perusahaan yang sudah difilter */}
+                  <View style={styles.perusahaanListWrapper}>
+                    {/* Clear/Tidak Ada Option */}
+                    <TouchableOpacity
+                      style={[
+                        styles.perusahaanListItem,
+                        !form.perusahaan_id &&
+                          !perusahaanManual &&
+                          styles.perusahaanListItemActive,
+                      ]}
+                      onPress={() => {
+                        setForm({ ...form, perusahaan_id: "" });
+                        setPerusahaanManual("");
+                        setPerusahaanSearch("");
+                      }}
+                    >
+                      <Text style={styles.perusahaanListItemText}>
+                        ❌ Tidak Ada / Kosongkan
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* VIP Companies First */}
+                    {perusahaanList
+                      .filter(
+                        (p) =>
+                          p.is_prioritas &&
+                          (!perusahaanSearch.trim() ||
+                            p.nama_perusahaan
+                              .toLowerCase()
+                              .includes(perusahaanSearch.toLowerCase())),
+                      )
+                      .map((item) => (
+                        <TouchableOpacity
+                          key={item.id}
+                          style={[
+                            styles.perusahaanListItem,
+                            form.perusahaan_id == item.id &&
+                              styles.perusahaanListItemActive,
+                          ]}
+                          onPress={() => {
+                            setForm({ ...form, perusahaan_id: item.id });
+                            setPerusahaanManual("");
+                            setPerusahaanSearch("");
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.perusahaanListItemText,
+                              form.perusahaan_id == item.id &&
+                                styles.perusahaanListItemTextActive,
+                            ]}
+                          >
+                            ⭐ {item.nama_perusahaan}{" "}
+                            <Text style={styles.vipBadge}>(VIP)</Text>
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+
+                    {/* Non-VIP Companies */}
+                    {perusahaanList
+                      .filter(
+                        (p) =>
+                          !p.is_prioritas &&
+                          (!perusahaanSearch.trim() ||
+                            p.nama_perusahaan
+                              .toLowerCase()
+                              .includes(perusahaanSearch.toLowerCase())),
+                      )
+                      .map((item) => (
+                        <TouchableOpacity
+                          key={item.id}
+                          style={[
+                            styles.perusahaanListItem,
+                            form.perusahaan_id == item.id &&
+                              styles.perusahaanListItemActive,
+                          ]}
+                          onPress={() => {
+                            setForm({ ...form, perusahaan_id: item.id });
+                            setPerusahaanManual("");
+                            setPerusahaanSearch("");
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.perusahaanListItemText,
+                              form.perusahaan_id == item.id &&
+                                styles.perusahaanListItemTextActive,
+                            ]}
+                          >
+                            {item.nama_perusahaan}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+
+                    {/* No Results Message */}
+                    {perusahaanSearch.trim() &&
+                      perusahaanList.filter((p) =>
+                        p.nama_perusahaan
+                          .toLowerCase()
+                          .includes(perusahaanSearch.toLowerCase()),
+                      ).length === 0 && (
+                        <View style={styles.perusahaanNoResults}>
+                          <Text style={styles.noResultsText}>
+                            Tidak ada perusahaan yang cocok
+                          </Text>
+                        </View>
+                      )}
+                  </View>
+                </View>
+              )}
+            </View>
 
             <Text style={styles.requiredNote}>* Field wajib diisi</Text>
 
@@ -477,9 +763,15 @@ export default function ScanScreen() {
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.primaryBtnText}>
-                  🎫 Ambil Nomor Antrean
-                </Text>
+                <View style={styles.buttonContent}>
+                  <MaterialIcons
+                    name="confirmation-number"
+                    size={16}
+                    color="#fff"
+                    style={styles.buttonIcon}
+                  />
+                  <Text style={styles.primaryBtnText}>Ambil Nomor Antrean</Text>
+                </View>
               )}
             </TouchableOpacity>
           </View>
@@ -500,7 +792,12 @@ export default function ScanScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           {/* Nomor Antrean */}
           <View style={styles.resultNomorCard}>
-            <Text style={styles.resultIcon}>🎫</Text>
+            <MaterialIcons
+              name="confirmation-number"
+              size={40}
+              color={Colors.white}
+              style={styles.resultIcon}
+            />
             <Text style={styles.resultNomorLabel}>Nomor Antrean Anda</Text>
             <Text style={styles.resultNomorValue}>{result.nomor_antrean}</Text>
 
@@ -509,9 +806,17 @@ export default function ScanScreen() {
               style={[styles.salinBtn, copied && styles.salinBtnCopied]}
               onPress={handleSalin}
             >
-              <Text style={styles.salinBtnText}>
-                {copied ? "✅ Tersalin!" : "📋 Salin Nomor Antrean"}
-              </Text>
+              <View style={styles.buttonContent}>
+                <MaterialIcons
+                  name="content-copy"
+                  size={16}
+                  color={Colors.white}
+                  style={styles.buttonIcon}
+                />
+                <Text style={styles.salinBtnText}>
+                  {copied ? "Tersalin!" : "Salin Nomor Antrean"}
+                </Text>
+              </View>
             </TouchableOpacity>
 
             {copied && (
@@ -522,11 +827,67 @@ export default function ScanScreen() {
           </View>
 
           {/* Status Validasi */}
+          {result.is_perusahaan_vip && (
+            <View
+              style={[
+                styles.statusCard,
+                { backgroundColor: "rgba(59, 130, 246, 0.15)" },
+              ]}
+            >
+              <View style={styles.statusRow}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <MaterialIcons
+                    name="star"
+                    size={16}
+                    color="#3b82f6"
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "600",
+                      color: "#3b82f6",
+                    }}
+                  >
+                    Perusahaan VIP
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    backgroundColor: "rgba(59, 130, 246, 0.2)",
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 20,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#3b82f6",
+                      fontSize: 12,
+                      fontWeight: "bold",
+                    }}
+                  >
+                    Prioritas
+                  </Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 13, color: "#3b82f6", marginTop: 4 }}>
+                Antrean ini mendapat prioritas khusus sebagai perusahaan VIP
+              </Text>
+            </View>
+          )}
+
           <View style={styles.statusCard}>
             <View style={styles.statusRow}>
               <Text style={styles.statusCardLabel}>Status Validasi Satpam</Text>
               <View style={styles.statusPendingBadge}>
-                <Text style={styles.statusPendingText}>⏳ Menunggu</Text>
+                <MaterialIcons
+                  name="hourglass-top"
+                  size={12}
+                  color={Colors.warning}
+                  style={styles.statusPendingIcon}
+                />
+                <Text style={styles.statusPendingText}>Menunggu</Text>
               </View>
             </View>
             <Text style={styles.statusCardNote}>
@@ -537,36 +898,49 @@ export default function ScanScreen() {
 
           {/* Info Kendaraan */}
           <View style={styles.card}>
-            <Text style={styles.cardSectionTitle}>📋 Ringkasan Data</Text>
+            <View style={styles.sectionTitleRow}>
+              <MaterialIcons
+                name="assignment"
+                size={16}
+                color={Colors.textPrimary}
+                style={styles.sectionTitleIcon}
+              />
+              <Text style={styles.cardSectionTitle}>Ringkasan Data</Text>
+            </View>
             {[
               {
-                icon: "👤",
+                icon: "person",
                 label: "Nama Supir",
                 val: result.kendaraan?.nama_supir,
               },
               {
-                icon: "🚗",
+                icon: "directions-car",
                 label: "No Polisi",
                 val: result.kendaraan?.nomor_polisi,
               },
               {
-                icon: "🚛",
+                icon: "local-shipping",
                 label: "Jenis",
                 val: result.kendaraan?.jenis_kendaraan,
               },
               {
-                icon: "⛽",
+                icon: "local-gas-station",
                 label: "Kapasitas",
                 val: result.kendaraan?.kapasitas_tangki,
               },
               {
-                icon: "🏢",
+                icon: "business",
                 label: "Perusahaan",
                 val: result.kendaraan?.perusahaan ?? "-",
               },
             ].map((item) => (
               <View key={item.label} style={styles.summaryRow}>
-                <Text style={styles.summaryIcon}>{item.icon}</Text>
+                <MaterialIcons
+                  name={item.icon}
+                  size={16}
+                  color={Colors.primary}
+                  style={styles.summaryIcon}
+                />
                 <Text style={styles.summaryLabel}>{item.label}</Text>
                 <Text style={styles.summaryVal}>{item.val}</Text>
               </View>
@@ -575,7 +949,15 @@ export default function ScanScreen() {
 
           {/* Langkah Selanjutnya */}
           <View style={styles.nextStepsCard}>
-            <Text style={styles.nextStepsTitle}>📌 Langkah Selanjutnya</Text>
+            <View style={styles.sectionTitleRow}>
+              <MaterialIcons
+                name="format-list-numbered"
+                size={16}
+                color={Colors.primary}
+                style={styles.sectionTitleIcon}
+              />
+              <Text style={styles.nextStepsTitle}>Langkah Selanjutnya</Text>
+            </View>
             {[
               "1. Tunjukkan nomor antrean ke petugas satpam",
               "2. Tunggu validasi dari satpam",
@@ -594,15 +976,23 @@ export default function ScanScreen() {
               style={[styles.primaryBtn, { flex: 1 }]}
               onPress={handleSalin}
             >
-              <Text style={styles.primaryBtnText}>
-                {copied ? "✅ Tersalin!" : "📋 Salin Nomor"}
-              </Text>
+              <View style={styles.buttonContent}>
+                <MaterialIcons
+                  name="content-copy"
+                  size={16}
+                  color={Colors.white}
+                  style={styles.buttonIcon}
+                />
+                <Text style={styles.primaryBtnText}>
+                  {copied ? "Tersalin!" : "Salin Nomor"}
+                </Text>
+              </View>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.secondaryBtn, { flex: 1 }]}
               onPress={handleReset}
             >
-              <Text style={styles.secondaryBtnText}>🔄 Daftar Lagi</Text>
+              <Text style={styles.secondaryBtnText}>Daftar Lagi</Text>
             </TouchableOpacity>
           </View>
 
@@ -634,9 +1024,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  headerLeft: { flex: 1 },
-  headerTitle: { color: Colors.white, fontSize: 18, fontWeight: "bold" },
-  headerSubtitle: { color: Colors.primaryLight, fontSize: 13, marginTop: 2 },
+  headerLeft: { flex: 1, flexDirection: "row", alignItems: "center" },
+  headerTitle: { color: Colors.white, fontSize: 20, fontWeight: "bold" },
+  headerSubtitle: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 12,
+    marginTop: 2,
+  },
   backBtn: { marginBottom: 4 },
   backBtnText: { color: Colors.primaryLight, fontSize: 13 },
   logoutBtn: {
@@ -944,6 +1338,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  statusPendingIcon: {
+    marginRight: 4,
   },
   statusPendingText: {
     color: Colors.warning,
@@ -960,7 +1359,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  summaryIcon: { fontSize: 16, marginRight: 10 },
+  summaryIcon: { marginRight: 10 },
   summaryLabel: { flex: 1, fontSize: 13, color: Colors.textSecondary },
   summaryVal: { fontSize: 13, fontWeight: "600", color: Colors.textPrimary },
 
@@ -977,6 +1376,19 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     marginBottom: 10,
   },
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  sectionTitleIcon: { marginRight: 8 },
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buttonIcon: { marginRight: 6 },
+  successIcon: { marginRight: 6 },
   nextStepItem: {
     fontSize: 13,
     color: Colors.primary,
@@ -986,4 +1398,81 @@ const styles = StyleSheet.create({
 
   // Result Actions
   resultActions: { flexDirection: "row", gap: 8, marginTop: 4 },
+
+  // Perusahaan Searchable Dropdown
+  perusahaanDropdownContainer: {
+    marginTop: 8,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderRadius: 8,
+    backgroundColor: "#f9fafb",
+    maxHeight: 250,
+    overflow: "hidden",
+  },
+  perusahaanListWrapper: {
+    paddingVertical: 4,
+  },
+  perusahaanListItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+  },
+  perusahaanListItemActive: {
+    backgroundColor: Colors.primaryLight,
+  },
+  perusahaanListItemText: {
+    fontSize: 13,
+    color: Colors.textPrimary,
+    fontWeight: "500",
+  },
+  perusahaanListItemTextActive: {
+    color: Colors.primary,
+    fontWeight: "700",
+  },
+  vipBadge: {
+    fontSize: 11,
+    color: "#d97706",
+    fontWeight: "bold",
+  },
+  perusahaanNoResults: {
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  noResultsText: {
+    fontSize: 13,
+    color: Colors.textLight,
+    fontStyle: "italic",
+  },
+
+  // Old button styles (kept for backward compatibility)
+  perusahaanButtonGroup: {
+    marginTop: 12,
+    paddingHorizontal: 0,
+  },
+  perusahaanButton: {
+    backgroundColor: "#f0f0f0",
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 8,
+    minHeight: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  perusahaanButtonActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  perusahaanButtonText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: Colors.textPrimary,
+  },
+  perusahaanButtonTextActive: {
+    color: Colors.white,
+  },
 });
