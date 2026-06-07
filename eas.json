@@ -4,28 +4,24 @@
       "developmentClient": true,
       "distribution": "internal",
       "android": {
-        "targetSdkVersion": 35,
         "buildType": "apk"
       }
     },
     "preview": {
       "distribution": "internal",
       "android": {
-        "targetSdkVersion": 35,
         "buildType": "apk"
       }
     },
     "production": {
       "distribution": "store",
       "android": {
-        "targetSdkVersion": 35,
         "buildType": "app-bundle"
       }
     },
     "preview-android": {
       "android": {
-        "buildType": "apk",
-        "targetSdkVersion": 35
+        "buildType": "apk"
       },
       "distribution": "internal"
     }
